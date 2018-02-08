@@ -1,44 +1,54 @@
-version: '2'
+version: '3'
 
 services:
-  mysql:
+
+  db_server:
     restart: on-failure
-    image: amacharla/aa-mysql
-    build:
-      context: .
-      dockerfile: dockerfile-mysql
-    container_name: db_server
+    image: amacharla/aa-db
+    deploy:
+      replicas: 2
     environment:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_LOG_CONSOLE=true
+    networks:
+      - aa-backend
     volumes:
-      - ./mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     ports:
       - "3306:3306"
 
-  nginx:
+  app_server:
     restart: on-failure
-    build:
-      context: .
-      dockerfile: dockerfile-nginx
-    image: amacharla/aa-nginx
-    container_name: web_server
+    deploy:
+      replicas: 2
+    image: amacharla/aa-app
+    links:
+      - web_server
+      - db_server
+    networks:
+      - aa-backend
+    volumes:
+      - web_app:/web_app
+    ports:
+      - "5001:5001"
+
+  web_server:
+    restart: on-failure
+    deploy:
+      replicas: 3
+    image: amacharla/aa-web
+    networks:
+      - aa-backend
     volumes:
       - ./web_app/static:/usr/share/nginx/html
     ports:
       - "80:80"
 
-  app-engine:
-    restart: on-failure
-    build:
-      context: .
-      dockerfile: dockerfile-app
-    image: amacharla/app-accelerator
-    container_name: app_server
-    links:
-      - nginx
-      - mysql
-    volumes:
-      - ./web_app:/web_app
-    ports:
-      - "5001:5001"
+networks:
+  aa-backend:
+          
+volumes:
+  mysql_data:
+    driver: "cloudstor:aws"
+  web_app:
+    driver: "cloudstor:aws"
